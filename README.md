@@ -170,3 +170,10 @@ python3 xtool.py envoyer 192.168.1.240 travail.gcode   # envoi d'un G-code
 
 Les retours d'essai sont les bienvenus. Ouvrez une *issue* en indiquant la
 machine, le matériau, les réglages et le résultat.
+
+## Licence
+
+Copyright © 2026 Yvan Godreau, fablab le Boc@l (centre social de Chemillé).
+
+Ce programme est un logiciel libre, distribué sous la licence
+[GNU GPL version 3](LICENSE) ou toute version ultérieure.
