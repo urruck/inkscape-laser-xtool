@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""Génère xtool_laser.inx (interface de l'extension) à partir de materiaux.json.
+Lancé par installer.sh."""
+import json
+import os
+from xml.sax.saxutils import escape, quoteattr
+
+ICI = os.path.dirname(os.path.abspath(__file__))
+
+TYPES = {"marquage": "Marquage (ligne)", "decoupe": "Découpe", "gravure": "Gravure (remplissage)"}
+COUCHES = [  # actif, couleur, type, puissance, vitesse
+    ("true", "0x0000ffff", "marquage", 30, 100),
+    ("true", "0xff0000ff", "decoupe", 90, 25),
+    ("false", "0x000000ff", "gravure", 20, 200),
+    ("false", "0x00ff00ff", "decoupe", 60, 10),
+]
+
+
+def options_type(defaut):
+    ordre = [defaut] + [t for t in TYPES if t != defaut]
+    return "\n".join(f'        <option value="{t}">{TYPES[t]}</option>' for t in ordre)
+
+
+def page_couche(n, actif, couleur, type_, puissance, vitesse):
+    return f'''    <page name="couche{n}" gui-text="Couche {n}">
+      <param name="c{n}_actif" type="bool" gui-text="Couche active">{actif}</param>
+      <param name="c{n}_couleur" type="color" appearance="colorbutton" gui-text="Couleur (contour, ou remplissage pour la gravure) :">{couleur}</param>
+      <param name="c{n}_type" type="optiongroup" appearance="combo" gui-text="Type :">
+{options_type(type_)}
+      </param>
+      <param name="c{n}_puissance" type="float" precision="1" min="0.1" max="100" gui-text="Puissance (%) :">{puissance}</param>
+      <param name="c{n}_vitesse" type="float" precision="1" min="0.1" max="4000" gui-text="Vitesse (mm/s) :">{vitesse}</param>
+      <param name="c{n}_passes" type="int" min="1" max="50" gui-text="Passes :">1</param>
+      <param name="c{n}_air" type="int" min="0" max="100" appearance="full" gui-text="Air assisté P2 (%) :">100</param>
+    </page>'''
+
+
+def main():
+    with open(os.path.join(ICI, "materiaux.json"), encoding="utf-8") as f:
+        materiaux = json.load(f)["materiaux"]
+    opts_mat = ['        <option value="manuel">Réglages manuels (onglets Couches et Images)</option>']
+    for m in materiaux:
+        opts_mat.append(f'        <option value={quoteattr(m["nom"])}>{escape(m["nom"])}</option>')
+    couches = "\n".join(page_couche(n, *c) for n, c in enumerate(COUCHES, start=1))
+    inx = f'''<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fichier généré par generer_inx.py à partir de materiaux.json : ne pas modifier à la main. -->
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Envoyer vers laser xTool</name>
+  <id>fablab.xtool.laser</id>
+  <param name="onglet" type="notebook">
+    <page name="machine" gui-text="Machine">
+      <param name="machine" type="optiongroup" appearance="combo" gui-text="Machine :">
+        <option value="P2">xTool P2 (CO2 55 W, 600 x 305 mm)</option>
+        <option value="F1U">xTool F1 Ultra (galvo, 220 x 220 mm)</option>
+      </param>
+      <param name="materiau" type="optiongroup" appearance="combo" gui-text="Matériau (P2) :">
+{chr(10).join(opts_mat)}
+      </param>
+      <label>Un matériau remplace l'épaisseur et les réglages des couches selon leur type (et des images). Liste modifiable dans materiaux.json.</label>
+      <param name="epaisseur" type="float" precision="1" min="0" max="20" gui-text="P2 : épaisseur du matériau (mm) :">3</param>
+      <label>Hauteur de la tête calculée comme xTool Studio : Z = 25 − épaisseur.</label>
+      <param name="laser" type="optiongroup" appearance="combo" gui-text="F1 Ultra : laser :">
+        <option value="bleu">Bleu (diode 20 W)</option>
+        <option value="rouge">Rouge (infrarouge 20 W, métal)</option>
+      </param>
+      <param name="frequence" type="int" min="1" max="4000" gui-text="F1 Ultra : fréquence (kHz) :">30</param>
+      <label>Coin haut-gauche de la page = origine de la machine (0, 0). Unités : mm.</label>
+    </page>
+{couches}
+    <page name="images" gui-text="Images">
+      <param name="img_actif" type="bool" gui-text="Graver les images (photos, logos importés)">true</param>
+      <param name="img_mode" type="optiongroup" appearance="combo" gui-text="Mode :">
+        <option value="tramage">Tramage (points, idéal photos)</option>
+        <option value="gris">Niveaux de gris (puissance variable)</option>
+        <option value="seuil">Noir et blanc (seuil 50 %)</option>
+      </param>
+      <param name="img_puissance" type="float" precision="1" min="0.1" max="100" gui-text="Puissance max (%) :">10</param>
+      <param name="img_puissance_min" type="float" precision="1" min="0" max="100" gui-text="Puissance min, niveaux de gris (%) :">0</param>
+      <param name="img_vitesse" type="float" precision="1" min="1" max="600" gui-text="Vitesse (mm/s) :">300</param>
+      <param name="img_resolution" type="float" precision="1" min="1" max="20" gui-text="Résolution (lignes/mm) :">10</param>
+      <param name="img_passes" type="int" min="1" max="20" gui-text="Passes :">1</param>
+      <param name="img_air" type="int" min="0" max="100" appearance="full" gui-text="Air assisté (%) :">100</param>
+      <label>Les images sont gravées en premier, avant les couches 1 à 4.</label>
+    </page>
+    <page name="options" gui-text="Options">
+      <label>Ordre : images, puis couches 1, 2, 3, 4. Mettez la découpe en dernier.</label>
+      <param name="gravure_resolution" type="float" precision="1" min="1" max="20" gui-text="Résolution des gravures de remplissage (lignes/mm) :">10</param>
+      <param name="tolerance" type="float" precision="3" min="0.005" max="1" gui-text="Précision des courbes (mm) :">0.05</param>
+      <param name="selection_seule" type="bool" gui-text="Seulement la sélection (si elle existe)">true</param>
+      <label>Les textes à découper ou marquer doivent être convertis : Chemin > Objet en chemin. En gravure de remplissage, les textes sont gravés tels quels.</label>
+    </page>
+    <page name="envoi" gui-text="Envoi">
+      <param name="action" type="optiongroup" appearance="radio" gui-text="Action :">
+        <option value="fichier">Enregistrer le G-code seulement</option>
+        <option value="cadrer">Cadrer (P2 : la tête fait 2 tours, laser à 0, départ au bouton)</option>
+        <option value="envoyer">Enregistrer et envoyer à la machine</option>
+      </param>
+      <param name="ip" type="string" gui-text="Adresse IP de la machine :">192.168.1.240</param>
+      <param name="fichier" type="string" gui-text="Fichier G-code :">~/xtool-travail.gcode</param>
+      <label>Après l'envoi, la machine attend l'appui sur son bouton pour démarrer.</label>
+    </page>
+  </param>
+  <effect needs-live-preview="false">
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Laser xTool"/>
+    </effects-menu>
+  </effect>
+  <script>
+    <command location="inx" interpreter="python">xtool_laser.py</command>
+  </script>
+</inkscape-extension>
+'''
+    with open(os.path.join(ICI, "xtool_laser.inx"), "w", encoding="utf-8") as f:
+        f.write(inx)
+    print(f"xtool_laser.inx généré ({len(materiaux)} matériau(x))")
+
+
+if __name__ == "__main__":
+    main()

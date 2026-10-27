@@ -1,0 +1,17 @@
+{
+  "_aide": "Réglages par matériau pour la P2. Types possibles : marquage, decoupe, gravure (remplissage des formes), image. puissance en %, vitesse en mm/s, resolution en lignes/mm, air en %. Après modification, relancer installer.sh puis Inkscape.",
+  "materiaux": [
+    {
+      "nom": "Contreplaqué tilleul 3 mm",
+      "source": "réglage officiel xTool relevé dans un travail P2 du 02/09/2026",
+      "epaisseur": 3,
+      "decoupe": {"puissance": 90, "vitesse": 25, "passes": 1, "air": 100},
+      "image": {"puissance": 10, "vitesse": 300, "resolution": 12, "air": 100}
+    },
+    {
+      "nom": "Carton (essai fablab)",
+      "source": "essai du 27/10/2026 : marquage visible",
+      "marquage": {"puissance": 10, "vitesse": 50, "passes": 1, "air": 100}
+    }
+  ]
+}

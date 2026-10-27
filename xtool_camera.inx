@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Caméra P2 : photo du plateau</name>
+  <id>fablab.xtool.camera</id>
+  <param name="ip" type="string" gui-text="Adresse IP de la P2 :">192.168.1.240</param>
+  <param name="opacite" type="int" min="5" max="100" appearance="full" gui-text="Opacité de la photo (%) :">100</param>
+  <param name="page" type="bool" gui-text="Mettre la page à la taille du plateau (600 x 305 mm)">true</param>
+  <param name="eclairage" type="bool" gui-text="Allumer l'éclairage de la P2 avant la photo">true</param>
+  <label>La photo est redressée avec le calibrage de la machine et placée dans un calque verrouillé « Caméra P2 », sous le dessin. Elle n'est jamais envoyée au laser.</label>
+  <effect needs-live-preview="false">
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Laser xTool"/>
+    </effects-menu>
+  </effect>
+  <script>
+    <command location="inx" interpreter="python">xtool_camera.py</command>
+  </script>
+</inkscape-extension>
