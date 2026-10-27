@@ -5,6 +5,8 @@
   xtool.py envoyer IP fichier.gcode      envoie un G-code (démarrage au bouton)
   xtool.py cadrer IP xmin ymin xmax ymax P2 : tête aux 4 coins, laser éteint
   xtool.py photo IP image.jpg            P2 : photo du plateau redressée
+  xtool.py mesurer IP [x y]              P2 : mesure l'épaisseur au point x y (mm),
+                                         par défaut au centre du plateau (300 150)
 """
 import os
 import sys
@@ -36,6 +38,16 @@ def main(args):
             image = xc.redresser(xc.photo_brute(ip), xc.calibration_camera(ip))
             image.save(args[2], quality=90)
             print(f"Photo enregistrée : {args[2]} ({image.width}x{image.height} px, 4 px/mm)")
+            return 0
+        if len(args) >= 2 and args[0] == "mesurer":
+            x, y = (float(args[2]), float(args[3])) if len(args) >= 4 else (300.0, 150.0)
+            print(f"Mesure au point X {x:g} Y {y:g} mm : la tête va bouger (laser éteint)...")
+            ep, details = xc.mesurer_epaisseur(args[1], x, y)
+            print(f"Détails : {details}")
+            if ep is None:
+                print("Mesure impossible ou hors limites (0 à 25 mm).")
+                return 1
+            print(f"Épaisseur mesurée : {ep:.1f} mm  (hauteur de tête Z = {xc.z_p2(ep):.1f})")
             return 0
     except (OSError, RuntimeError, ValueError) as e:
         print(f"Erreur : {e}")

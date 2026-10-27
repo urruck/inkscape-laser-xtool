@@ -10,6 +10,7 @@ import io
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 
@@ -307,6 +308,64 @@ def cadrer(ip, xmin, ymin, xmax, ymax, tours=1):
         for x, y in ((xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax), (xmin, ymin)):
             deplacer_tete(ip, x, y)
     tete_origine(ip)
+
+
+# --- Mesure de l'épaisseur (P2) -----------------------------------------------
+# Relevé dans xTool Studio (méthode « RULE_TWO », P2 dont le n° de série
+# commence par MXPK007 à MXPK010) : la tête porte une LED infrarouge décalée
+# en X ; la machine calcule elle-même l'épaisseur sous ce point.
+
+DECALAGE_IR_P2 = (68.0, -0.6)  # mm, valeur par défaut de xTool (LED IR / laser)
+
+
+def decalage_ir(ip):
+    """Décalage LED IR / laser propre à la machine (config « laserMeasureOffset »,
+    texte du type « X68.2Y-0.5Z0 »), sinon la valeur par défaut."""
+    try:
+        rep = json.loads(_post_json(ip, "/config/get", {"alias": "config", "type": "user",
+                                                       "kv": ["laserMeasureOffset"]}))
+        texte = str((rep.get("data") or rep).get("laserMeasureOffset") or "")
+        m = re.match(r"X(-?[\d.]+)Y(-?[\d.]+)", texte)
+        if m:
+            return float(m.group(1)), float(m.group(2))
+    except (urllib.error.URLError, OSError, ValueError, AttributeError):
+        pass
+    return DECALAGE_IR_P2
+
+
+def mesurer_epaisseur(ip, x, y):
+    """Mesure l'épaisseur du matériau au point (x, y) mm du plateau.
+    La tête se déplace tout de suite (laser éteint), puis revient à l'origine.
+    Renvoie (épaisseur en mm ou None, détails pour le diagnostic)."""
+    verifier_libre(ip)
+    dx, _ = decalage_ir(ip)
+    tx = x - dx
+    if tx < 0:
+        raise ValueError(f"Point trop à gauche : la mesure n'est possible qu'à partir de X = {dx:.0f} mm.")
+    details = {"decalage_ir": dx, "tete": (round(tx, 3), round(y, 3))}
+    try:
+        deplacer_tete(ip, tx, y)
+        _post_json(ip, "/peripheral/fill_light", {"action": "set_bri", "idx": 0, "value": 0})
+        _post_json(ip, "/peripheral/ir_led", {"action": "on", "index": 1})
+        time.sleep(0.2)
+        brut = _post_json(ip, "/peripheral/ir_measure_distance",
+                          {"action": "get_distance", "type": "single"}, timeout=30)
+        details["reponse"] = brut
+    finally:
+        for chemin, donnees in (("/peripheral/ir_led", {"action": "off", "index": 1}),
+                                ("/peripheral/fill_light", {"action": "set_bri", "idx": 0, "value": 255})):
+            try:
+                _post_json(ip, chemin, donnees)
+            except (urllib.error.URLError, OSError):
+                pass
+        tete_origine(ip)
+    try:
+        rep = json.loads(brut)
+        z = float((rep.get("data") or rep)["distance"])
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None, details
+    # Comme xTool : en mode plan, la valeur rendue est l'épaisseur, valide de 0 à 25 mm
+    return (z if 0 <= z <= 25 else None), details
 
 
 # --- Caméra de la P2 ----------------------------------------------------------

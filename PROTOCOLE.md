@@ -24,6 +24,27 @@ travail G-code ordinaire à puissance nulle (S0), qui fait deux fois le tour du
 dessin. Comme tout travail, il attend le bouton : on peut ainsi le regarder
 de près.
 
+### Mesure de l'épaisseur (P2 « RULE_TWO », n° de série MXPK007 à MXPK010)
+
+Séquence suivie par xTool Studio. **Pas encore vérifiée sur la machine.**
+
+1. Lire le décalage entre la LED infrarouge et le laser :
+   `POST /config/get` `{"alias":"config","type":"user","kv":["laserMeasureOffset"]}`.
+   On obtient un texte `X..Y..Z..`. Valeur par défaut : X = 68 mm.
+2. Placer la tête en `x_point − décalage_X`, `y_point` avec
+   `/peripheral/laser_head` `go_to`.
+3. Éteindre l'éclairage (`fill_light` à 0) et allumer la LED IR :
+   `POST /peripheral/ir_led` `{"action":"on","index":1}`.
+4. `POST /peripheral/ir_measure_distance` `{"action":"get_distance","type":"single"}`
+   renvoie `coord_x`, `coord_y` et `distance`. En mode plan, `distance` est
+   l'épaisseur en mm ; elle est valide de 0 à 25.
+5. Éteindre la LED IR (`index 1`, `off`), rallumer l'éclairage et ramener
+   la tête à l'origine.
+
+Les P2 plus anciennes (« RULE_ONE ») prennent une photo rapprochée
+(`stream=1`) du point IR, et le calcul se fait dans une bibliothèque fermée
+de xTool Studio, à partir de `local_ir.txt`.
+
 ### Caméra : port 8329
 
 - `GET /camera/snap?stream=0` : vue large, JPEG 4656 × 3496 ;

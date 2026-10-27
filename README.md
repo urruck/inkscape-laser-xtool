@@ -141,6 +141,7 @@ python3 xtool.py sonder  192.168.1.240                 # état de la machine
 python3 xtool.py cadrer  192.168.1.240 10 10 60 40     # tête aux 4 coins x1 y1 x2 y2 (mm), tout de suite
 python3 xtool.py photo   192.168.1.240 plateau.jpg     # photo redressée
 python3 xtool.py envoyer 192.168.1.240 travail.gcode   # envoi d'un G-code
+python3 xtool.py mesurer 192.168.1.240 200 100         # épaisseur au point x y (mm), à tester
 ```
 
 ## Fichiers
@@ -161,7 +162,8 @@ python3 xtool.py envoyer 192.168.1.240 travail.gcode   # envoi d'un G-code
 
 - La gravure se fait par balayage horizontal seulement, sans hachures
   croisées.
-- L'épaisseur se saisit à la main : pas de mesure automatique.
+- Mesure automatique de l'épaisseur : en ligne de commande seulement
+  (`xtool.py mesurer`), pas encore testée sur machine.
 - Le calibrage de la caméra est fait pour 3 mm d'épaisseur. Un léger
   décalage est possible avec des matériaux plus épais.
 - La tête ne descend pas entre les passes de découpe.
