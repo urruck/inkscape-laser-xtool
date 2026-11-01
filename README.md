@@ -188,6 +188,15 @@ python3 xtool.py mesurer 192.168.1.240 200 100         # épaisseur au point x y
 Les retours d'essai sont les bienvenus. Ouvrez une *issue* en indiquant la
 machine, le matériau, les réglages et le résultat.
 
+## Voir aussi
+
+[**fablab-postes**](https://github.com/urruck/fablab-postes) : le script
+d'installation des postes Linux du Boc@l (Zorin, Ubuntu, Mint). Il installe
+notamment Inkscape avec **MightyScape**, les quelque 240 extensions du
+FabLab Chemnitz, traduites en français et regroupées dans un menu
+**FabLab Boc@l** (`fablab-poste.sh`, ou `paquets/install-mightyscape.sh`
+pour MightyScape seul).
+
 ## Licence
 
 Copyright © 2026 Yvan Godreau, fablab le Boc@l (centre social de Chemillé).
