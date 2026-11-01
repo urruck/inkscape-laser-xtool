@@ -28,6 +28,13 @@ TYPES_P2 = {"marquage": 1, "decoupe": 3, "remplissage": 4, "image": 2}
 
 EPAISSEUR_MAX_P2 = 20.0
 
+# Support du matériau sur la P2 (mode de traitement de xTool Studio).
+# Sur le plateau, on donne l'épaisseur (Z = 25 − épaisseur). Sur le panneau
+# alvéolé, xTool Studio demande la distance focale, envoyée telle quelle
+# (Z = distance focale, de 0 à 28 mm).
+SUPPORTS_P2 = {"plan": "LASER_PLANE", "alveole": "HONEYCOMB_PANEL"}
+FOCALE_MAX_ALVEOLE = 28.0
+
 
 def _fmt(v):
     """Nombre au format xTool : 3 décimales max, sans zéros inutiles."""
@@ -59,19 +66,31 @@ def z_p2(epaisseur):
     return 25.0 - epaisseur
 
 
-def gcode_p2(calques, epaisseur=3.0):
-    """calques = liste de dicts {chemins, puissance, vitesse, passes, type, air}.
-    type : 'marquage' ou 'decoupe'. air : 0..100 % (0 = coupé)."""
+def hauteur_p2(support="plan", epaisseur=3.0, focale=None):
+    """Hauteur Z de travail de la P2 et nom du mode pour l'en-tête du G-code."""
+    if support not in SUPPORTS_P2:
+        raise ValueError(f"Support inconnu : {support}")
+    if support == "alveole":
+        if focale is None or not 0 <= focale <= FOCALE_MAX_ALVEOLE:
+            raise ValueError(f"Distance focale hors limites : {focale} mm (0 à {FOCALE_MAX_ALVEOLE:g})")
+        return float(focale), SUPPORTS_P2[support]
     if not 0 <= epaisseur <= EPAISSEUR_MAX_P2:
         raise ValueError(f"Épaisseur hors limites : {epaisseur} mm (0 à {EPAISSEUR_MAX_P2:g})")
-    z = z_p2(epaisseur)
+    return z_p2(epaisseur), SUPPORTS_P2[support]
+
+
+def gcode_p2(calques, epaisseur=3.0, support="plan", focale=None):
+    """calques = liste de dicts {chemins, puissance, vitesse, passes, type, air}.
+    type : 'marquage' ou 'decoupe'. air : 0..100 % (0 = coupé).
+    support : 'plan' (épaisseur) ou 'alveole' (distance focale)."""
+    z, mode = hauteur_p2(support, epaisseur, focale)
     p0 = calques[0]
     out = [
         "G90",
         "G0 F3000",
         "",
         "# P2 HEAD",
-        '# WorkingInfo={"mode":"LASER_PLANE"}',
+        f'# WorkingInfo={{"mode":"{mode}"}}',
         f'# WorkingInfo={{"focalLen":{_fmt(z)}}}',
         f'# WorkingInfo={{"speed":{_fmt(p0["vitesse"])}}}',
         f'# WorkingInfo={{"power":{_fmt(p0["puissance"])}}}',
@@ -121,19 +140,19 @@ def gcode_p2(calques, epaisseur=3.0):
     return "\n".join(out) + "\n"
 
 
-def gcode_cadrage_p2(xmin, ymin, xmax, ymax, epaisseur=3.0, vitesse=50.0, tours=2):
+def gcode_cadrage_p2(xmin, ymin, xmax, ymax, epaisseur=3.0, vitesse=50.0, tours=2,
+                     support="plan", focale=None):
     """Cadrage sous forme de travail : la tête fait le tour de la zone avec
     le laser à puissance 0 (S0). Comme un travail normal, la machine attend
     l'appui sur son bouton pour démarrer."""
-    if not 0 <= epaisseur <= EPAISSEUR_MAX_P2:
-        raise ValueError(f"Épaisseur hors limites : {epaisseur} mm (0 à {EPAISSEUR_MAX_P2:g})")
+    z, mode = hauteur_p2(support, epaisseur, focale)
     f = int(round(vitesse * 60))
     out = [
         "G90",
         "G0 F3000",
         "",
         "# P2 HEAD",
-        '# WorkingInfo={"mode":"LASER_PLANE"}',
+        f'# WorkingInfo={{"mode":"{mode}"}}',
         "G0 F9600",
         "G0 X0 Y0",
         "M4 S0",
@@ -147,7 +166,7 @@ def gcode_cadrage_p2(xmin, ymin, xmax, ymax, epaisseur=3.0, vitesse=50.0, tours=
         "# motion_start",
         "# cadrage : laser à 0",
         "M15 S0",
-        f"G0Z{z_p2(epaisseur):.3f}",
+        f"G0Z{z:.3f}",
         f"G0X{_fmt(xmin)}Y{_fmt(ymin)}",
     ]
     for _ in range(tours):
@@ -333,8 +352,9 @@ def decalage_ir(ip):
     return DECALAGE_IR_P2
 
 
-def mesurer_epaisseur(ip, x, y):
+def mesurer_epaisseur(ip, x, y, support="plan"):
     """Mesure l'épaisseur du matériau au point (x, y) mm du plateau.
+    Sur le panneau alvéolé, la distance focale à utiliser est 25 − valeur rendue.
     La tête se déplace tout de suite (laser éteint), puis revient à l'origine.
     Renvoie (épaisseur en mm ou None, détails pour le diagnostic)."""
     verifier_libre(ip)
@@ -364,8 +384,10 @@ def mesurer_epaisseur(ip, x, y):
         z = float((rep.get("data") or rep)["distance"])
     except (ValueError, KeyError, TypeError, AttributeError):
         return None, details
-    # Comme xTool : en mode plan, la valeur rendue est l'épaisseur, valide de 0 à 25 mm
-    return (z if 0 <= z <= 25 else None), details
+    # Comme xTool : valeur valide de 0 à 25 mm sur le plateau, de −3 à 25 mm
+    # sur le panneau alvéolé (distance focale de 0 à 28 mm)
+    mini = 25 - FOCALE_MAX_ALVEOLE if support == "alveole" else 0
+    return (z if mini <= z <= 25 else None), details
 
 
 # --- Caméra de la P2 ----------------------------------------------------------

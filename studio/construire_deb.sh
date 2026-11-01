@@ -2,7 +2,7 @@
 # Construit le paquet Debian/Ubuntu d'Atelier Laser : dist/atelier-laser_VERSION_all.deb
 # Installation ensuite : sudo apt install ./dist/atelier-laser_VERSION_all.deb
 set -euo pipefail
-VERSION="${1:-0.1.0}"
+VERSION="${1:-0.2.0}"
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="$(dirname "$ICI")"
 SORTIE="$RACINE/dist"
@@ -14,6 +14,7 @@ P="$TRAVAIL/atelier-laser"
 install -d "$P/usr/share/atelier-laser/studio/web"
 install -m 644 "$RACINE"/{xtool_common.py,xtool_raster.py,materiaux.json} "$P/usr/share/atelier-laser/"
 install -m 755 "$ICI/atelier_laser.py" "$P/usr/share/atelier-laser/studio/"
+install -m 644 "$ICI/xtool_studio.py" "$P/usr/share/atelier-laser/studio/"
 install -m 644 "$ICI"/web/* "$P/usr/share/atelier-laser/studio/web/"
 
 install -d "$P/usr/bin"

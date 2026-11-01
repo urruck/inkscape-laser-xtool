@@ -33,6 +33,7 @@ RACINE = os.path.dirname(ICI)
 sys.path.insert(0, RACINE)
 
 import xtool_common as xc  # noqa: E402
+import xtool_studio  # noqa: E402
 
 WEB = os.path.join(ICI, "web")
 DOSSIER_CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "atelier-laser")
@@ -75,7 +76,9 @@ def construire_gcode(travail):
     m = xc.MACHINES[machine]
     larg, haut = m["zone"]
     epaisseur = float(travail.get("epaisseur", 3))
-    z = xc.z_p2(epaisseur)
+    support = travail.get("support", "plan")
+    focale = float(travail["focale"]) if travail.get("focale") is not None else None
+    z = xc.hauteur_p2(support, epaisseur, focale)[0] if machine == "P2" else 0
     calques, boites = [], []
 
     for n, b in enumerate(travail.get("blocs", []), start=1):
@@ -124,7 +127,7 @@ def construire_gcode(travail):
         raise ValueError(f"Le dessin dépasse la zone de la {m['nom']} ({larg:g} × {haut:g} mm) : "
                          f"X {xmin:.1f} à {xmax:.1f}, Y {ymin:.1f} à {ymax:.1f} mm.")
     if machine == "P2":
-        gcode = xc.gcode_p2(calques, epaisseur=epaisseur)
+        gcode = xc.gcode_p2(calques, epaisseur=epaisseur, support=support, focale=focale)
     else:
         gcode = xc.gcode_f1u(calques, laser=travail.get("laser", "bleu"),
                              frequence=int(travail.get("frequence", 30)))
@@ -285,6 +288,26 @@ def enregistrer_materiau(mat):
     return donnees
 
 
+_cache_xtool = {"date": None, "liste": []}
+
+
+def materiaux_xtool():
+    """Matériaux officiels lus dans le cache de xTool Studio, relus s'il a changé."""
+    try:
+        date = max(os.path.getmtime(os.path.join(xtool_studio.DOSSIER_IDB, n))
+                   for n in os.listdir(xtool_studio.DOSSIER_IDB))
+    except (OSError, ValueError):
+        return []
+    if date != _cache_xtool["date"]:
+        try:
+            _cache_xtool["liste"] = xtool_studio.materiaux()
+        except Exception as e:  # format inattendu : on continue sans ces matériaux
+            print("Matériaux xTool Studio illisibles :", e, file=sys.stderr)
+            _cache_xtool["liste"] = []
+        _cache_xtool["date"] = date
+    return _cache_xtool["liste"]
+
+
 def polices():
     """Familles de polices installées (fc-list), triées."""
     try:
@@ -418,7 +441,8 @@ class Gestionnaire(BaseHTTPRequestHandler):
             if chemin == "/api/materiaux":
                 if d.get("materiau"):
                     enregistrer_materiau(d["materiau"])
-                return self._envoyer(200, lire_json(FICHIER_MATERIAUX, {"materiaux": []}))
+                perso = lire_json(FICHIER_MATERIAUX, {"materiaux": []}).get("materiaux", [])
+                return self._envoyer(200, {"materiaux": perso + materiaux_xtool()})
             if chemin == "/api/reglages":
                 if d:
                     ecrire_json(FICHIER_REGLAGES, d)
@@ -459,11 +483,12 @@ class Gestionnaire(BaseHTTPRequestHandler):
                     "image": "data:image/jpeg;base64," + base64.b64encode(tampon.getvalue()).decode("ascii"),
                     "largeur": image.width / xc.PX_PAR_MM, "hauteur": image.height / xc.PX_PAR_MM})
             if chemin == "/api/mesurer":
-                ep, details = xc.mesurer_epaisseur(d["ip"], float(d["x"]), float(d["y"]))
+                support = d.get("support", "plan")
+                ep, details = xc.mesurer_epaisseur(d["ip"], float(d["x"]), float(d["y"]), support)
                 # Journal des mesures, pour mettre au point la fonction sur la machine
                 os.makedirs(DOSSIER_CONFIG, exist_ok=True)
                 with open(FICHIER_MESURES, "a", encoding="utf-8") as f:
-                    f.write(json.dumps({"x": d["x"], "y": d["y"], "epaisseur": ep, **details},
+                    f.write(json.dumps({"x": d["x"], "y": d["y"], "support": support, "epaisseur": ep, **details},
                                        ensure_ascii=False) + "\n")
                 return self._envoyer(200, {"epaisseur": ep, "details": details})
             if chemin == "/api/apercu":
@@ -480,8 +505,10 @@ class Gestionnaire(BaseHTTPRequestHandler):
                 if d.get("machine", "P2") != "P2":
                     return self._erreur("L'encadrement n'est disponible que pour la P2 pour l'instant.")
                 x0, y0, x1, y1 = (float(v) for v in d["zone"])
+                focale = float(d["focale"]) if d.get("focale") is not None else None
                 gcode = xc.gcode_cadrage_p2(x0, y0, x1, y1, epaisseur=float(d.get("epaisseur", 3)),
-                                            vitesse=float(d.get("vitesse", 50)), tours=int(d.get("tours", 2)))
+                                            vitesse=float(d.get("vitesse", 50)), tours=int(d.get("tours", 2)),
+                                            support=d.get("support", "plan"), focale=focale)
                 xc.verifier_libre(d["ip"])
                 ok, rep = xc.envoyer(d["ip"], gcode)
                 if not ok:

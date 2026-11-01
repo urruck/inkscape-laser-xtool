@@ -39,6 +39,8 @@ const etat = {
   frequence: 30,
   materiau: "",
   epaisseur: 3,
+  support: "plan", // P2 : "plan" (plateau, épaisseur) ou "alveole" (panneau alvéolé, distance focale)
+  focale: 22,
   materiaux: [],
   appareil: { ip: "", connecte: false, mode: null, nom: "", serie: "" },
   projet: { nom: "Sans titre", chemin: null },
@@ -128,14 +130,21 @@ function visuelMachine(machine, actif = true) {
 
 // --- Modèle ---------------------------------------------------------------
 
-function materiauCourant() { return etat.materiaux.find((m) => m.nom === etat.materiau) || null; }
+const machineDe = (m) => m.machine || "P2";
+const materiauxMachine = () => etat.materiaux.filter((m) => machineDe(m) === etat.machine);
+function materiauCourant() { return materiauxMachine().find((m) => m.nom === etat.materiau) || null; }
+// Réglages d'un type pour le support choisi (panneau alvéolé : réglages propres s'il y en a)
+function reglageMateriau(mat, cle) {
+  if (!mat || !mat[cle]) return null;
+  return { ...mat[cle], ...(mat.modes?.[etat.support]?.[cle] || {}) };
+}
 
 function paramsPour(type, estImage) {
   const base = type === "graver" ? (estImage ? DEFAUTS.image : DEFAUTS.graver) : DEFAUTS[type];
   const p = { ...DEFAUTS.graver, ...base, type, ignorer: false };
   const mat = materiauCourant();
   const cle = type === "graver" ? (estImage ? "image" : "gravure") : CLE_MATERIAU[type];
-  const r = mat && mat[cle];
+  const r = reglageMateriau(mat, cle);
   if (r) {
     for (const k of ["puissance", "vitesse", "passes", "air", "mode", "puissance_min"]) if (r[k] !== undefined) p[k] = r[k];
     if (r.resolution) p.lpcm = r.resolution * 10;
@@ -1187,7 +1196,7 @@ async function importerFichiers(fichiers) {
 function projetJson() {
   return {
     format: "atelier-laser", version: 1, machine: etat.machine, materiau: etat.materiau, epaisseur: etat.epaisseur,
-    laser: etat.laser, frequence: etat.frequence, objets: etat.objets,
+    support: etat.support, focale: etat.focale, laser: etat.laser, frequence: etat.frequence, objets: etat.objets,
   };
 }
 
@@ -1200,6 +1209,8 @@ function chargerProjet(p, nom, chemin = null) {
   if (p.machine && MACHINES[p.machine]) etat.machine = p.machine;
   etat.materiau = p.materiau || "";
   etat.epaisseur = p.epaisseur ?? 3;
+  if (p.support) etat.support = p.support;
+  if (p.focale !== undefined) etat.focale = p.focale;
   etat.laser = p.laser || "bleu";
   etat.projet = { nom: nom.replace(/\.alaser$/i, ""), chemin };
   $("#nom-projet").textContent = etat.projet.nom;
@@ -1404,7 +1415,10 @@ async function construireTravail() {
     }
   }
   return {
-    travail: { machine: etat.machine, epaisseur: etat.epaisseur, laser: etat.laser, frequence: etat.frequence, blocs, ip: etat.appareil.ip },
+    travail: {
+      machine: etat.machine, epaisseur: etat.epaisseur, support: etat.support, focale: etat.focale,
+      laser: etat.laser, frequence: etat.frequence, blocs, ip: etat.appareil.ip,
+    },
     apercu,
     avertissements,
   };
@@ -1467,7 +1481,9 @@ async function demarrer(exporterSeulement = false) {
       `<div class="stat"><span>Durée estimée</span><b>≈ ${dureeTexte(resume.duree)}</b></div>` +
       `<div class="stat"><span>Zone</span><b>${fmt(z[2] - z[0])} × ${fmt(z[3] - z[1])} mm</b></div>` +
       `<div class="stat"><span>Position</span><b>X ${fmt(z[0])} · Y ${fmt(z[1])}</b></div>` +
-      (etat.machine === "P2" ? `<div class="stat"><span>Épaisseur</span><b>${fmt(etat.epaisseur)} mm (Z ${fmt(resume.z)})</b></div>` : "") +
+      (etat.machine === "P2" ? (etat.support === "alveole"
+        ? `<div class="stat"><span>Panneau alvéolé</span><b>distance focale ${fmt(etat.focale)} mm (Z ${fmt(resume.z)})</b></div>`
+        : `<div class="stat"><span>Épaisseur</span><b>${fmt(etat.epaisseur)} mm (Z ${fmt(resume.z)})</b></div>`) : "") +
       (mat ? `<div class="stat"><span>Matériel</span><b>${esc(mat.nom)}</b></div>` : "") +
       `<div class="blocs">${blocs}</div></div></div>` +
       prepa.avertissements.map((a) => `<div class="note attention">${icone("alerte", 18)}<span>${esc(a)}</span></div>`).join("") +
@@ -1536,7 +1552,7 @@ function cadrer() {
           etat.cadrage = { vitesse: borne(lireNombre($("#cad-vitesse").value) || 50, 5, 250), tours: borne(Math.round(lireNombre($("#cad-tours").value)) || 2, 1, 10) };
           b.disabled = true;
           try {
-            await api("cadrer", { ip: etat.appareil.ip, machine: etat.machine, zone: [x0, y0, x1, y1], epaisseur: etat.epaisseur, ...etat.cadrage });
+            await api("cadrer", { ip: etat.appareil.ip, machine: etat.machine, zone: [x0, y0, x1, y1], epaisseur: etat.epaisseur, support: etat.support, focale: etat.focale, ...etat.cadrage });
             sauverReglages();
             modale({
               titre: "Encadrement envoyé",
@@ -1571,12 +1587,26 @@ function majMachine() {
   $("#champ-laser").hidden = etat.machine !== "F1U";
   $("#champ-epaisseur").hidden = etat.machine !== "P2";
   for (const b of $$("#seg-laser button")) b.classList.toggle("actif", b.dataset.val === etat.laser);
-  $("#epaisseur").value = etat.epaisseur;
+  if (etat.machine !== "P2") etat.support = "plan";
+  majMateriaux();
+  $("#mode-traitement").value = etat.support;
+  $("#mode-traitement").disabled = etat.machine !== "P2";
+  majChampHauteur();
   if (!m.gravure) for (const o of etat.objets) if (o.proc.type === "graver" && o.genre !== "image") o.proc = paramsPour("contour", false);
   clePropsCourante = "";
   majPlateau();
   majAppareil();
   rafraichir();
+}
+
+// Champ sous « Matériel » : épaisseur sur le plateau, distance focale sur le panneau alvéolé
+function majChampHauteur() {
+  const alveole = etat.support === "alveole";
+  $("#label-hauteur").textContent = alveole ? "Distance focale" : "Épaisseur";
+  const c = $("#epaisseur");
+  c.max = alveole ? 28 : 20;
+  c.value = alveole ? etat.focale : etat.epaisseur;
+  c.title = alveole ? "Hauteur de la tête au-dessus du panneau alvéolé (0 à 28 mm), comme dans xTool Studio" : "";
 }
 
 async function connecter(ip, machine) {
@@ -1659,33 +1689,36 @@ async function rafraichirCamera() {
 
 async function mesurerEpaisseur() {
   if (!etat.appareil.connecte) { ouvrirConnexion(); return; }
+  const alveole = etat.support === "alveole";
   const s = selection();
   const [l, h] = MACHINES[etat.machine].zone;
   let x = l / 2, y = h / 2;
   if (s.length) { const bb = boiteObjets(s); x = (bb[0] + bb[2]) / 2; y = (bb[1] + bb[3]) / 2; }
   const ok = await confirmer("Mesure automatique",
-    `La tête va se déplacer (laser éteint) pour mesurer l'épaisseur au point X ${fmt(x)} · Y ${fmt(y)} mm` +
+    `La tête va se déplacer (laser éteint) pour mesurer ${alveole ? "la distance focale" : "l'épaisseur"} au point X ${fmt(x)} · Y ${fmt(y)} mm` +
     `${s.length ? " (centre de la sélection)" : " (centre du plateau)"}. Le matériau doit être posé sous ce point.<br><br><b>Fonction expérimentale</b> : vérifiez la valeur obtenue.`, "Mesurer");
   if (!ok) return;
   const b = $("#btn-mesurer");
   b.disabled = true;
   try {
-    const r = await api("mesurer", { ip: etat.appareil.ip, x, y });
+    const r = await api("mesurer", { ip: etat.appareil.ip, x, y, support: etat.support });
     if (r.epaisseur === null || r.epaisseur === undefined) {
       const rep = document.createElement("pre");
       rep.className = "reponse-brute";
       rep.textContent = JSON.stringify(r.details, null, 2);
       modale({ titre: "Mesure impossible",
-        corps: `<p>La machine n'a pas rendu d'épaisseur valide (0 à 25 mm). Réponse reçue, à transmettre pour la mise au point
+        corps: `<p>La machine n'a pas rendu de mesure valide (${alveole ? "−3" : "0"} à 25 mm). Réponse reçue, à transmettre pour la mise au point
           (elle est aussi notée dans <code>~/.config/atelier-laser/mesures.log</code>) :</p>${rep.outerHTML}`,
         boutons: [{ texte: "Fermer", genre: "primaire" }] });
       b.disabled = false;
       return;
     }
-    etat.epaisseur = Math.round(r.epaisseur * 10) / 10;
-    $("#epaisseur").value = etat.epaisseur;
+    // Comme xTool Studio : sur le panneau alvéolé, distance focale = 25 − valeur mesurée
+    if (alveole) etat.focale = Math.round((25 - r.epaisseur) * 10) / 10;
+    else etat.epaisseur = Math.round(r.epaisseur * 10) / 10;
+    majChampHauteur();
     marquerModifie();
-    toast(`Épaisseur mesurée : ${fmt(etat.epaisseur)} mm`, "ok");
+    toast(alveole ? `Distance focale mesurée : ${fmt(etat.focale)} mm` : `Épaisseur mesurée : ${fmt(etat.epaisseur)} mm`, "ok");
   } catch (e) { toast(`Mesure : ${e.message}`, "erreur", 7000); }
   b.disabled = false;
 }
@@ -1702,15 +1735,24 @@ async function chargerMateriaux() {
 
 function majMateriaux() {
   const s = $("#materiau");
+  const liste = materiauxMachine();
+  const options = (l) => l.map((m) => `<option value="${esc(m.nom)}" title="${esc(m.source || "")}">${esc(m.nom)}</option>`).join("");
+  const perso = liste.filter((m) => m.origine !== "xtool"), xtool = liste.filter((m) => m.origine === "xtool");
   s.innerHTML = `<option value="">Défini par l'utilisateur</option>` +
-    etat.materiaux.map((m) => `<option value="${esc(m.nom)}">${esc(m.nom)}${m.epaisseur ? "" : ""}</option>`).join("");
-  s.value = etat.materiaux.some((m) => m.nom === etat.materiau) ? etat.materiau : "";
+    (perso.length ? `<optgroup label="Mes matériaux">${options(perso)}</optgroup>` : "") +
+    (xtool.length ? `<optgroup label="xTool Studio (réglages officiels)">${options(xtool)}</optgroup>` : "");
+  s.value = liste.some((m) => m.nom === etat.materiau) ? etat.materiau : "";
 }
 
 function appliquerMateriau() {
   const mat = materiauCourant();
   memoriser();
-  if (mat?.epaisseur !== undefined) { etat.epaisseur = +mat.epaisseur; $("#epaisseur").value = etat.epaisseur; }
+  if (mat?.epaisseur !== undefined) { etat.epaisseur = +mat.epaisseur; majChampHauteur(); }
+  if (mat && etat.machine === "F1U") {
+    if (mat.laser) { etat.laser = mat.laser; for (const b of $$("#seg-laser button")) b.classList.toggle("actif", b.dataset.val === etat.laser); }
+    const f = ["marquage", "decoupe", "gravure"].map((k) => mat[k]?.frequence).find(Boolean);
+    if (f) etat.frequence = f;
+  }
   let n = 0;
   if (mat) for (const o of etat.objets) {
     const cle = o.proc.type === "graver" ? (o.genre === "image" ? "image" : "gravure") : CLE_MATERIAU[o.proc.type];
@@ -1748,7 +1790,8 @@ function sauverMateriau() {
         action: async () => {
           const nom = $("#mat-nom").value.trim();
           if (!nom) { toast("Donnez un nom au matériau", "erreur"); return; }
-          const m = { nom, source: $("#mat-source").value.trim() };
+          const m = { nom, machine: etat.machine, source: $("#mat-source").value.trim() };
+          if (etat.machine === "F1U") m.laser = etat.laser;
           const ep = $("#mat-ep");
           if (ep && Number.isFinite(lireNombre(ep.value))) m.epaisseur = lireNombre(ep.value);
           for (const t of types) {
@@ -1777,6 +1820,7 @@ function sauverReglages() {
   api("reglages", {
     ip: etat.appareil.ip, derniereIp: etat.derniereIp || "", machine: etat.machine, theme: etat.theme, grille: etat.grille,
     ratio: etat.ratio !== false, cadrage: etat.cadrage || null, laser: etat.laser,
+    support: etat.support, focale: etat.focale,
   }).catch(() => {});
 }
 
@@ -1863,8 +1907,23 @@ function brancherActions() {
   $("#materiau").addEventListener("change", (e) => { etat.materiau = e.target.value; appliquerMateriau(); });
   $("#epaisseur").addEventListener("change", (e) => {
     const v = lireNombre(e.target.value);
-    if (!Number.isFinite(v) || v < 0 || v > 20) { toast("Épaisseur entre 0 et 20 mm", "erreur"); e.target.value = etat.epaisseur; return; }
-    etat.epaisseur = v; marquerModifie();
+    const alveole = etat.support === "alveole", max = alveole ? 28 : 20;
+    if (!Number.isFinite(v) || v < 0 || v > max) {
+      toast(`${alveole ? "Distance focale" : "Épaisseur"} entre 0 et ${max} mm`, "erreur");
+      majChampHauteur();
+      return;
+    }
+    if (alveole) etat.focale = v; else etat.epaisseur = v;
+    marquerModifie();
+    sauverReglages();
+  });
+  $("#mode-traitement").addEventListener("change", (e) => {
+    etat.support = e.target.value;
+    majChampHauteur();
+    marquerModifie();
+    sauverReglages();
+    if (materiauCourant()?.modes) appliquerMateriau();
+    if (etat.support === "alveole") toast("Assurez-vous que le panneau alvéolé a été placé sur les supports de lamelle.", "", 6000);
   });
   $("#opacite-fond").addEventListener("input", (e) => { etat.camera.opacite = +e.target.value; majPlateau(); });
   $("#fichier-import").addEventListener("change", (e) => { importerFichiers(Array.from(e.target.files)); e.target.value = ""; });
@@ -1953,6 +2012,8 @@ async function init() {
     if (r.ratio === false) etat.ratio = false;
     if (r.cadrage) etat.cadrage = r.cadrage;
     if (r.laser) etat.laser = r.laser;
+    if (r.support) etat.support = r.support;
+    if (Number.isFinite(r.focale)) etat.focale = r.focale;
     etat.derniereIp = r.derniereIp || "";
     etat.appareil.ip = r.ip || "";
     etat.avecFenetre = r._fenetre !== false;

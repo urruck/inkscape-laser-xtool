@@ -1,5 +1,5 @@
 {
-  "_aide": "Réglages par matériau pour la P2. Types possibles : marquage, decoupe, gravure (remplissage des formes), image. puissance en %, vitesse en mm/s, resolution en lignes/mm, air en %. Après modification, relancer installer.sh puis Inkscape.",
+  "_aide": "Réglages par matériau pour la P2. Types possibles : marquage, decoupe, gravure (remplissage des formes), image. puissance en %, vitesse en mm/s, resolution en lignes/mm, air en %. machine : P2 (par défaut) ou F1U. modes.alveole : réglages propres au panneau alvéolé. Après modification, relancer installer.sh puis Inkscape.",
   "materiaux": [
     {
       "nom": "Contreplaqué tilleul 3 mm",

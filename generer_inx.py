@@ -40,6 +40,8 @@ def main():
         materiaux = json.load(f)["materiaux"]
     opts_mat = ['        <option value="manuel">Réglages manuels (onglets Couches et Images)</option>']
     for m in materiaux:
+        if m.get("machine", "P2") != "P2":  # matériaux F1 Ultra ajoutés par Atelier Laser
+            continue
         opts_mat.append(f'        <option value={quoteattr(m["nom"])}>{escape(m["nom"])}</option>')
     couches = "\n".join(page_couche(n, *c) for n, c in enumerate(COUCHES, start=1))
     inx = f'''<?xml version="1.0" encoding="UTF-8"?>

@@ -37,7 +37,9 @@ Séquence suivie par xTool Studio. **Pas encore vérifiée sur la machine.**
    `POST /peripheral/ir_led` `{"action":"on","index":1}`.
 4. `POST /peripheral/ir_measure_distance` `{"action":"get_distance","type":"single"}`
    renvoie `coord_x`, `coord_y` et `distance`. En mode plan, `distance` est
-   l'épaisseur en mm ; elle est valide de 0 à 25.
+   l'épaisseur en mm ; elle est valide de 0 à 25. Sur le panneau alvéolé
+   (`HONEYCOMB_PANEL`), elle est valide de −3 à 25 et la distance focale
+   vaut 25 − `distance` (classe `zI` de l'extension P2 de xTool Studio).
 5. Éteindre la LED IR (`index 1`, `off`), rallumer l'éclairage et ramener
    la tête à l'origine.
 
@@ -62,6 +64,9 @@ de xTool Studio, à partir de `local_ir.txt`.
 
 - `S` = puissance % × 10 (0–1000) ; `F` = vitesse en mm/min.
 - Hauteur de tête : `G0Z{25 − épaisseur}`. Un vrai travail à 3 mm donne `Z22`.
+- Panneau alvéolé : l'en-tête porte `# WorkingInfo={"mode":"HONEYCOMB_PANEL"}`
+  et la hauteur est la distance focale : `G0Z{distance focale}` (0 à 28 mm).
+  Le reste du G-code est identique au mode plan (`T0`, mêmes réglages).
 - Chaque bloc commence par :
   - `M2519S{type}T0`, avec 1 = marquage, 3 = découpe, 2 = image,
     4 = remplissage ;
@@ -74,6 +79,36 @@ de xTool Studio, à partir de `local_ir.txt`.
   - `S` modal ;
   - dépassement en bout de ligne = 1,125 · v² / (2 · 3600) mm, avec v en
     mm/s. On obtient 14,06 mm à 300 mm/s, comme xTool.
+
+### Convoyeur d'alimentation P2 (`LASER_CONVEYOR_FEEDER`) : pas encore pris en charge
+
+Relevé dans xTool Studio 1.9.14, **non vérifié** :
+
+- zone de travail 500 × 3197 mm, décalage X = −50, départ Y = 192 ;
+- en-tête : `G0 Y192` après `G0 X0 Y0`, puis `M32U1000` et `M35U160` ;
+- les X du dessin vont à l'axe X (décalage −50) et les Y à l'axe `U`, celui
+  du convoyeur. Avec un firmware récent, `M535U1.8044` règle le rapport et
+  le facteur vaut −1 ; sinon le facteur vaut −3,02 ;
+- le calcul final des coordonnées se fait dans une bibliothèque compilée
+  de xTool Studio (`lib_dq.so`) : le sens du décalage reste à confirmer.
+
+Pour l'ajouter sans risque, il faut un G-code de référence : dans
+xTool Studio, mode convoyeur, un carré de 20 mm placé à un endroit connu,
+exporté en G-code.
+
+### Matériaux de xTool Studio
+
+Les fiches de matériaux (réglages officiels) sont gardées dans
+`~/.config/xTool Studio/IndexedDB/atomm_renderer_0.indexeddb.leveldb` :
+
+- fiche matériau : `id`, `name` (une traduction par langue), `thickness`,
+  `code` ;
+- réglages : `deviceCode` (`MP2` pour la P2, `GS002` pour la F1 Ultra),
+  `materialId`, et `machineParas`, une ligne par mode de traitement
+  (`LASER_PLANE`, `HONEYCOMB_PANEL`, `LASER_CONVEYOR_FEEDER`…), type
+  (`VECTOR_ENGRAVING`, `VECTOR_CUTTING`, `FILL_VECTOR_ENGRAVING`,
+  `BITMAP_ENGRAVING`), source laser et `power` (%), `speed` (mm/s),
+  `repeat`, `density` (lignes/cm), `bitmapMode`, `frequency`.
 
 ## xTool F1 Ultra
 

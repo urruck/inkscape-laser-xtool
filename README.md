@@ -22,7 +22,7 @@ proche de xTool Studio : appareil, matériau, paramètres de traitement par
 objet, Encadrement et Démarrer. Pour l'installer, deux possibilités :
 
 - le paquet `.deb` (Ubuntu, Zorin, Mint, Debian…) : `bash studio/construire_deb.sh`,
-  puis `sudo apt install ./dist/atelier-laser_0.1.0_all.deb` ;
+  puis `sudo apt install ./dist/atelier-laser_0.2.0_all.deb` ;
 - sans droits administrateur : `bash studio/installer.sh`.
 
 Tous les détails sont dans [studio/README.md](studio/README.md).

@@ -145,7 +145,7 @@
       <section class="carte" id="carte-mode">
         <div class="ligne-champ">
           <label>Mode</label>
-          <select id="mode-traitement"><option value="plan">Laser plat</option></select>
+          <select id="mode-traitement"><option value="plan">Laser plat</option><option value="alveole">Panneau alvéolé</option></select>
         </div>
         <div class="ligne-champ" id="champ-laser" hidden>
           <label>Source laser</label>
@@ -159,7 +159,7 @@
           <select id="materiau"></select>
         </div>
         <div class="ligne-champ" id="champ-epaisseur">
-          <label>Épaisseur</label>
+          <label id="label-hauteur">Épaisseur</label>
           <div class="avec-unite"><input type="number" id="epaisseur" min="0" max="20" step="0.1" value="3"><span>mm</span></div>
           <button class="btn petit secondaire" data-action="mesurer" id="btn-mesurer" title="Mesure automatique (expérimental)"><span data-ic="mesure" data-ic-taille="16"></span>Mesure automatique</button>
         </div>
