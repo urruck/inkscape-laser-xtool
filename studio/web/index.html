@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier Laser</title>
+<link rel="icon" href="icone.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Barre du haut : menu, annuler/rétablir, nom du projet, appareil -->
+  <header class="haut">
+    <div class="logo"><img src="icone.svg" alt=""><span>Atelier Laser</span></div>
+    <nav class="menus">
+      <div class="menu" data-menu="fichier">
+        <button class="menu-titre">Fichier</button>
+        <div class="menu-liste">
+          <button data-action="nouveau"><span>Nouveau projet</span><kbd>Ctrl N</kbd></button>
+          <button data-action="ouvrir"><span>Ouvrir un projet…</span><kbd>Ctrl O</kbd></button>
+          <button data-action="enregistrer"><span>Enregistrer</span><kbd>Ctrl S</kbd></button>
+          <button data-action="enregistrer-sous"><span>Enregistrer sous…</span><kbd>Ctrl Maj S</kbd></button>
+          <hr>
+          <button data-action="importer"><span>Importer (SVG, image)…</span><kbd>Ctrl I</kbd></button>
+          <button data-action="exporter"><span>Exporter le G-code…</span><kbd>Ctrl E</kbd></button>
+        </div>
+      </div>
+      <div class="menu" data-menu="edition">
+        <button class="menu-titre">Édition</button>
+        <div class="menu-liste">
+          <button data-action="annuler"><span>Annuler</span><kbd>Ctrl Z</kbd></button>
+          <button data-action="retablir"><span>Rétablir</span><kbd>Ctrl Y</kbd></button>
+          <hr>
+          <button data-action="copier"><span>Copier</span><kbd>Ctrl C</kbd></button>
+          <button data-action="coller"><span>Coller</span><kbd>Ctrl V</kbd></button>
+          <button data-action="dupliquer"><span>Dupliquer</span><kbd>Ctrl D</kbd></button>
+          <button data-action="supprimer"><span>Supprimer</span><kbd>Suppr</kbd></button>
+          <hr>
+          <button data-action="tout"><span>Tout sélectionner</span><kbd>Ctrl A</kbd></button>
+        </div>
+      </div>
+      <div class="menu" data-menu="affichage">
+        <button class="menu-titre">Affichage</button>
+        <div class="menu-liste">
+          <button data-action="adapter"><span>Adapter à l'écran</span><kbd>Maj 1</kbd></button>
+          <button data-action="zoom-plus"><span>Zoomer</span><kbd>+</kbd></button>
+          <button data-action="zoom-moins"><span>Dézoomer</span><kbd>−</kbd></button>
+          <hr>
+          <button data-action="grille"><span>Afficher la grille</span><span class="coche" id="coche-grille"></span></button>
+          <button data-action="theme"><span>Thème sombre</span><span class="coche" id="coche-theme"></span></button>
+        </div>
+      </div>
+      <div class="menu" data-menu="aide">
+        <button class="menu-titre">Aide</button>
+        <div class="menu-liste">
+          <button data-action="raccourcis"><span>Raccourcis clavier</span></button>
+          <button data-action="apropos"><span>À propos</span></button>
+        </div>
+      </div>
+    </nav>
+    <div class="haut-actions">
+      <button class="ico" data-action="annuler" data-ic="annuler" title="Annuler (Ctrl Z)"></button>
+      <button class="ico" data-action="retablir" data-ic="retablir" title="Rétablir (Ctrl Y)"></button>
+    </div>
+    <div class="titre-projet"><span id="nom-projet">Sans titre</span><span id="modifie" class="point-modif" hidden></span></div>
+    <button class="puce-appareil" id="puce-appareil" data-action="connecter">
+      <span class="voyant" id="voyant"></span>
+      <span class="puce-texte"><b id="puce-nom">Connecter l'appareil</b><small id="puce-etat">Aucun appareil</small></span>
+      <span data-ic="chevron" data-ic-taille="16"></span>
+    </button>
+  </header>
+
+  <!-- Barre des propriétés de l'objet sélectionné -->
+  <div class="barre-props" id="barre-props"></div>
+
+  <!-- Outils -->
+  <aside class="outils" id="outils">
+    <button class="outil actif" data-outil="selection" data-ic="selection" title="Sélectionner (V)"><span>Sélection</span></button>
+    <button class="outil" data-outil="main" data-ic="main" title="Déplacer la vue (H ou Espace)"><span>Vue</span></button>
+    <div class="sep"></div>
+    <button class="outil" data-outil="rect" data-ic="rect" title="Rectangle (R)"><span>Rectangle</span></button>
+    <button class="outil" data-outil="ellipse" data-ic="ellipse" title="Ellipse (E)"><span>Ellipse</span></button>
+    <button class="outil" data-outil="polygone" data-ic="polygone" title="Polygone (P)"><span>Polygone</span></button>
+    <button class="outil" data-outil="ligne" data-ic="ligne" title="Ligne (L)"><span>Ligne</span></button>
+    <button class="outil" data-outil="texte" data-ic="texte" title="Texte (T)"><span>Texte</span></button>
+    <div class="sep"></div>
+    <button class="outil" data-action="importer" data-ic="image" title="Importer une image ou un SVG (Ctrl I)"><span>Importer</span></button>
+  </aside>
+
+  <!-- Canevas -->
+  <main class="zone" id="zone">
+    <canvas class="regle regle-h" id="regle-h"></canvas>
+    <canvas class="regle regle-v" id="regle-v"></canvas>
+    <div class="coin-regles"></div>
+    <svg id="canevas" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="grille-fine" width="10" height="10" patternUnits="userSpaceOnUse">
+          <path d="M10 0H0V10" fill="none" class="trait-grille"/>
+        </pattern>
+        <pattern id="grille-large" width="50" height="50" patternUnits="userSpaceOnUse">
+          <rect width="50" height="50" fill="url(#grille-fine)"/>
+          <path d="M50 0H0V50" fill="none" class="trait-grille-fort"/>
+        </pattern>
+      </defs>
+      <g id="vue">
+        <rect id="plateau" x="0" y="0" width="600" height="305"/>
+        <image id="fond-camera" x="0" y="0" width="0" height="0" preserveAspectRatio="none"/>
+        <rect id="grille" x="0" y="0" width="600" height="305" fill="url(#grille-large)"/>
+        <rect id="bord-plateau" x="0" y="0" width="600" height="305"/>
+        <g id="scene"></g>
+        <g id="surcouche"></g>
+      </g>
+    </svg>
+    <div class="flottant haut-gauche" id="outils-camera">
+      <button class="bouton-flottant" data-action="camera" id="bouton-camera"><span data-ic="camera" data-ic-taille="18"></span>Rafraîchir l'arrière-plan</button>
+      <div class="reglage-fond" id="reglage-fond" hidden>
+        <button class="ico petit" data-action="fond-visible" id="bouton-fond" data-ic="oeil" data-ic-taille="18" title="Afficher ou masquer la photo"></button>
+        <input type="range" id="opacite-fond" min="10" max="100" value="100" title="Opacité de la photo">
+      </div>
+    </div>
+    <div class="flottant bas-gauche coords" id="coords">X 0,0  Y 0,0 mm</div>
+    <div class="flottant bas-centre zoom">
+      <button class="ico petit" data-action="zoom-moins" data-ic="moins" data-ic-taille="18" title="Dézoomer"></button>
+      <button class="zoom-val" id="zoom-val" data-action="adapter" title="Adapter à l'écran">100 %</button>
+      <button class="ico petit" data-action="zoom-plus" data-ic="plus" data-ic-taille="18" title="Zoomer"></button>
+      <span class="sep-v"></span>
+      <button class="ico petit" data-action="adapter" data-ic="adapter" data-ic-taille="18" title="Adapter à l'écran"></button>
+    </div>
+    <div class="depot" id="depot" hidden><div><span data-ic="importer" data-ic-taille="40"></span>Déposez vos fichiers SVG ou images ici</div></div>
+  </main>
+
+  <!-- Panneau de droite : appareil, matériau, paramètres, liste d'objets -->
+  <aside class="droite">
+    <div class="defile">
+      <section class="carte appareil" id="carte-appareil">
+        <div class="appareil-visuel" id="appareil-visuel"></div>
+        <div class="appareil-infos">
+          <b id="app-nom">Aucun appareil</b>
+          <small id="app-detail">Connectez une P2 ou une F1 Ultra</small>
+        </div>
+        <button class="btn petit" data-action="connecter" id="btn-connecter">Connecter</button>
+      </section>
+
+      <section class="carte" id="carte-mode">
+        <div class="ligne-champ">
+          <label>Mode</label>
+          <select id="mode-traitement"><option value="plan">Laser plat</option></select>
+        </div>
+        <div class="ligne-champ" id="champ-laser" hidden>
+          <label>Source laser</label>
+          <div class="segments" id="seg-laser">
+            <button data-val="bleu" class="actif">Diode bleue</button>
+            <button data-val="rouge">Infrarouge</button>
+          </div>
+        </div>
+        <div class="ligne-champ">
+          <label>Matériel</label>
+          <select id="materiau"></select>
+        </div>
+        <div class="ligne-champ" id="champ-epaisseur">
+          <label>Épaisseur</label>
+          <div class="avec-unite"><input type="number" id="epaisseur" min="0" max="20" step="0.1" value="3"><span>mm</span></div>
+          <button class="btn petit secondaire" data-action="mesurer" id="btn-mesurer" title="Mesure automatique (expérimental)"><span data-ic="mesure" data-ic-taille="16"></span>Mesure automatique</button>
+        </div>
+      </section>
+
+      <section class="carte" id="carte-params">
+        <div class="carte-titre">
+          <h3>Paramètres de traitement</h3>
+          <span class="discret" id="params-cible"></span>
+        </div>
+        <div id="params-vide" class="vide">
+          <span data-ic="selection" data-ic-taille="28"></span>
+          <p>Sélectionnez un objet sur le canevas pour choisir son type de traitement et ses réglages.</p>
+        </div>
+        <div id="params" hidden>
+          <label class="petit-titre">Type de traitement</label>
+          <div class="segments types" id="seg-type">
+            <button data-val="contour"><i class="pastille contour"></i>Graver contour</button>
+            <button data-val="graver"><i class="pastille graver"></i>Graver</button>
+            <button data-val="couper"><i class="pastille couper"></i>Couper</button>
+          </div>
+          <div class="curseur-champ">
+            <div class="entete"><label for="p-puissance">Puissance</label><div class="avec-unite"><input type="number" id="n-puissance" min="1" max="100" step="1"><span>%</span></div></div>
+            <input type="range" id="p-puissance" min="1" max="100" step="1">
+          </div>
+          <div class="curseur-champ">
+            <div class="entete"><label for="p-vitesse">Vitesse</label><div class="avec-unite"><input type="number" id="n-vitesse" min="1" max="600" step="1"><span>mm/s</span></div></div>
+            <input type="range" id="p-vitesse" min="1" max="600" step="1">
+          </div>
+          <div class="ligne-champ">
+            <label>Passer</label>
+            <div class="compteur"><button data-pas="-1" data-ic="moins" data-ic-taille="16"></button><input type="number" id="n-passes" min="1" max="50" value="1"><button data-pas="1" data-ic="plus" data-ic-taille="16"></button></div>
+          </div>
+          <div id="params-graver" hidden>
+            <div class="ligne-champ" id="champ-bitmap">
+              <label>Mode Bitmap</label>
+              <select id="p-mode">
+                <option value="gris">Nuances de gris</option>
+                <option value="tramage">Tramage (Floyd-Steinberg)</option>
+                <option value="seuil">Noir et blanc</option>
+              </select>
+            </div>
+            <div class="ligne-champ">
+              <label>Lignes par cm</label>
+              <div class="avec-unite"><input type="number" id="n-lpcm" min="20" max="250" step="5"><span>l/cm</span></div>
+            </div>
+            <div class="ligne-champ" id="champ-pmin">
+              <label>Puissance min.</label>
+              <div class="avec-unite"><input type="number" id="n-pmin" min="0" max="100" step="1"><span>%</span></div>
+            </div>
+          </div>
+          <div class="curseur-champ" id="champ-air">
+            <div class="entete"><label for="p-air">Assistance d'air</label><div class="avec-unite"><input type="number" id="n-air" min="0" max="100" step="5"><span>%</span></div></div>
+            <input type="range" id="p-air" min="0" max="100" step="5">
+          </div>
+          <label class="interrupteur"><input type="checkbox" id="p-ignorer"><span></span>Ne pas traiter cet objet</label>
+          <button class="lien" data-action="sauver-materiau"><span data-ic="materiau" data-ic-taille="16"></span>Enregistrer comme matériau…</button>
+        </div>
+      </section>
+
+      <section class="carte liste-carte">
+        <div class="carte-titre"><h3>Liste d'objets</h3><span class="discret" id="nb-objets">0</span></div>
+        <ul class="liste-objets" id="liste-objets"></ul>
+        <div class="vide petit" id="liste-vide">Aucun objet pour le moment</div>
+      </section>
+    </div>
+
+    <footer class="pied">
+      <button class="btn secondaire grand" data-action="cadrer" id="btn-cadrer"><span data-ic="cadre" data-ic-taille="18"></span>Encadrement</button>
+      <button class="btn primaire grand" data-action="demarrer" id="btn-demarrer"><span data-ic="lecture" data-ic-taille="18"></span>Démarrer</button>
+    </footer>
+  </aside>
+</div>
+
+<div id="modale-fond" class="modale-fond" hidden><div class="modale" id="modale"></div></div>
+<div id="toasts" class="toasts"></div>
+<svg id="mesure-svg" xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>
+<input type="file" id="fichier-import" accept=".svg,.png,.jpg,.jpeg,.bmp,.webp,.gif,image/*" multiple hidden>
+<input type="file" id="fichier-projet" accept=".alaser,.json" hidden>
+
+<script src="icones.js"></script>
+<script src="geometrie.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

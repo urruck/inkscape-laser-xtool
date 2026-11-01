@@ -14,6 +14,21 @@ cadrer et envoyer un travail à la machine par le réseau, sans autre logiciel.
 > **La machine ne démarre jamais seule** : après chaque envoi, elle attend
 > l'appui sur son bouton.
 
+## Nouveau : Atelier Laser, un logiciel à part
+
+Si vous préférez ne pas passer par Inkscape, le dossier [`studio/`](studio/)
+contient **Atelier Laser**. C'est un logiciel autonome dont l'interface est
+proche de xTool Studio : appareil, matériau, paramètres de traitement par
+objet, Encadrement et Démarrer. Pour l'installer, deux possibilités :
+
+- le paquet `.deb` (Ubuntu, Zorin, Mint, Debian…) : `bash studio/construire_deb.sh`,
+  puis `sudo apt install ./dist/atelier-laser_0.1.0_all.deb` ;
+- sans droits administrateur : `bash studio/installer.sh`.
+
+Tous les détails sont dans [studio/README.md](studio/README.md).
+
+![Atelier Laser](captures/atelier-laser.png)
+
 ## Ce que ça fait
 
 ![Le dessin dans Inkscape et l'aperçu simulé du travail laser](captures/dessin-et-apercu.png)
